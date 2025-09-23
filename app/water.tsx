@@ -17,6 +17,9 @@ interface WaterLog {
   timestamp: Date;
 }
 
+
+
+
 const GOAL_ML = 2000; // Цель — 2 литра в день
 
 const Water: React.FC = () => {
@@ -117,6 +120,7 @@ const Water: React.FC = () => {
     </SafeAreaView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
