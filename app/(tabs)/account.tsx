@@ -14,8 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 // Локальное состояние профиля (пока без бэкенда)
 const Account: React.FC = () => {
   const [user, setUser] = useState({
-    name: 'Алексей Петров',
-    email: 'alex@example.com',
+    name: 'Олег Шибаев',
+    email: 'oleg@example.com',
     avatar: 'https://via.placeholder.com/150',
     joinDate: '12 января 2024',
     streak: 15, // дней подряд

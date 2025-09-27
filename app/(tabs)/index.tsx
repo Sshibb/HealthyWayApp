@@ -30,11 +30,19 @@ export default function HomeScreen() {
         </Link>
 
         {/* Третья */}
-        <Link href="/mood" asChild>
+         <Link href="/sport" asChild>
           <TouchableOpacity style={styles.emptySection} activeOpacity={0.8}>
-            <Text style={styles.section1Title}>😌</Text>
+            <Text style={styles.section1Title}>🏃🏻</Text>
           </TouchableOpacity>
         </Link>
+
+       {/* Четвертая */}
+        <Link href="/achievements" asChild>
+          <TouchableOpacity style={styles.emptySection} activeOpacity={0.8}>
+            <Text style={styles.section1Title}>🏆</Text>
+          </TouchableOpacity>
+        </Link>
+        
 
         
       </ScrollView>

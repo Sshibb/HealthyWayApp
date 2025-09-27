@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { achievementService } from './achievement-service';
 
 // Типы
 interface WaterLog {
@@ -17,23 +18,63 @@ interface WaterLog {
   timestamp: Date;
 }
 
-
-
-
 const GOAL_ML = 2000; // Цель — 2 литра в день
+
+// Генерируем часы с 6 утра до 10 вечера
+const HOURS = Array.from({ length: 17 }, (_, i) => 6 + i); // 6, 7, ..., 22
 
 const Water: React.FC = () => {
   const [logs, setLogs] = useState<WaterLog[]>([]);
   const totalConsumed = logs.reduce((sum, log) => sum + log.amount, 0);
   const progress = Math.min(totalConsumed / GOAL_ML, 1);
 
-  const addWater = (amount: number) => {
+  // Группируем логи по часам
+  const hourlyData = useMemo(() => {
+    const data: Record<number, number> = {};
+    HOURS.forEach((hour) => {
+      data[hour] = 0;
+    });
+
+    logs.forEach((log) => {
+      const hour = log.timestamp.getHours();
+      if (HOURS.includes(hour)) {
+        data[hour] += log.amount;
+      }
+    });
+
+    return data;
+  }, [logs]);
+
+  // Максимальное значение для масштабирования
+  const maxAmount = Math.max(...Object.values(hourlyData), 1);
+
+  const addWater = async (amount: number) => {
     const newLog: WaterLog = {
       id: Date.now().toString(),
       amount,
       timestamp: new Date(),
     };
     setLogs((prev) => [...prev, newLog]);
+    
+    // Отправляем данные в сервис достижений
+    try {
+      const { unlocked } = await achievementService.updateProgress({
+        water: {
+          amount: amount,
+          date: new Date(),
+        },
+      });
+      
+      if (unlocked.length > 0) {
+        // Показываем уведомление о новых достижениях
+        unlocked.forEach(achievement => {
+          Alert.alert('🎉 Новое достижение!', 
+            `"${achievement.title}"\n\n${achievement.description}`);
+        });
+      }
+    } catch (error) {
+      console.error('Error updating achievements:', error);
+    }
   };
 
   const resetLogs = () => {
@@ -75,6 +116,32 @@ const Water: React.FC = () => {
                 { width: `${progress * 100}%` },
               ]}
             />
+          </View>
+        </View>
+
+        {/* График */}
+        <View style={styles.chartContainer}>
+          <Text style={styles.chartTitle}>Ваш график сегодня</Text>
+          <View style={styles.chart}>
+            {HOURS.map((hour) => {
+              const amount = hourlyData[hour];
+              const heightPercent = (amount / maxAmount) * 100;
+              const opacity = amount > 0 ? 1 : 0.3;
+              return (
+                <View key={hour} style={styles.barContainer}>
+                  <View
+                    style={[
+                      styles.bar,
+                      {
+                        height: Math.max(heightPercent, 5), // минимум 5% чтобы был виден
+                        backgroundColor: `rgba(76, 175, 80, ${opacity})`,
+                      },
+                    ]}
+                  />
+                  <Text style={styles.barLabel}>{hour}:00</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -121,6 +188,7 @@ const Water: React.FC = () => {
   );
 };
 
+const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
@@ -162,6 +230,47 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#4CAF50',
     borderRadius: 6,
+  },
+  chartContainer: {
+    width: '100%',
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  chart: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 150,
+    paddingHorizontal: 10,
+  },
+  barContainer: {
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 2,
+  },
+  bar: {
+    width: (width - 80) / 17 - 8, // адаптивная ширина
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  barLabel: {
+    fontSize: 10,
+    color: '#666',
+    textAlign: 'center',
   },
   buttonsContainer: {
     flexDirection: 'row',
