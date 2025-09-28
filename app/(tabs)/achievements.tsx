@@ -1,453 +1,316 @@
+// app/achievements.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
   Alert,
-  Image,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { achievementService, Achievement } from '../achievement-service';
+import { Link } from 'expo-router';
+import { achievementsService, Achievement } from '../achievements-service';
 
-const [achievements, setAchievements] = useState<Achievement[]>([]);
+const { width } = Dimensions.get('window');
 
-useEffect(() => {
-  const loadAchievements = async () => {
-    const loaded = await achievementService.loadAchievements();
-    setAchievements(loaded);
-  };
-  
-  loadAchievements();
-}, []);
-
-// Типы для достижений
-interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  category: 'water' | 'sleep' | 'sport' | 'mood' | 'streak' | 'general';
-  requirement: string;
-  progress: number;
-  target: number;
-  completed: boolean;
-  dateCompleted?: Date;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
-}
-
-const Achievements: React.FC = () => {
+export default function AchievementsScreen() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'uncompleted'>('all');
-  const [categoryFilter, setCategoryFilter] = useState<'all' | Achievement['category']>('all');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [unlockedCount, setUnlockedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
 
-  // Инициализация достижений
   useEffect(() => {
-    const initialAchievements: Achievement[] = [
-      // Вода
-      {
-        id: '1',
-        title: 'Первая капля',
-        description: 'Выпейте первый стакан воды',
-        icon: '💧',
-        category: 'water',
-        requirement: 'Выпить 250 мл воды',
-        progress: 0,
-        target: 250,
-        completed: false,
-        rarity: 'common',
-      },
-      {
-        id: '2',
-        title: 'Водохлёб',
-        description: 'Выпейте 2 литра воды за день',
-        icon: '🌊',
-        category: 'water',
-        requirement: 'Выпить 2000 мл воды за день',
-        progress: 0,
-        target: 2000,
-        completed: false,
-        rarity: 'rare',
-      },
-      {
-        id: '3',
-        title: 'Морской котик',
-        description: 'Выпейте 10 литров воды за неделю',
-        icon: '🦭',
-        category: 'water',
-        requirement: 'Выпить 10000 мл воды за неделю',
-        progress: 0,
-        target: 10000,
-        completed: false,
-        rarity: 'epic',
-      },
-
-      // Сон
-      {
-        id: '4',
-        title: 'Первая ночь',
-        description: 'Запишите первый сон',
-        icon: '🌙',
-        category: 'sleep',
-        requirement: 'Записать 1 ночь сна',
-        progress: 0,
-        target: 1,
-        completed: false,
-        rarity: 'common',
-      },
-      {
-        id: '5',
-        title: 'Здоровый сон',
-        description: 'Проспите 8 часов за ночь',
-        icon: '😴',
-        category: 'sleep',
-        requirement: 'Проспать 8 часов за одну ночь',
-        progress: 0,
-        target: 8,
-        completed: false,
-        rarity: 'rare',
-      },
-      {
-        id: '6',
-        title: 'Мастер сна',
-        description: 'Спите 8+ часов 7 ночей подряд',
-        icon: '🛌',
-        category: 'sleep',
-        requirement: '7 ночей с 8+ часами сна',
-        progress: 0,
-        target: 7,
-        completed: false,
-        rarity: 'legendary',
-      },
-
-      // Спорт
-      {
-        id: '7',
-        title: 'Первая тренировка',
-        description: 'Завершите первую тренировку',
-        icon: '🏃',
-        category: 'sport',
-        requirement: 'Завершить 1 тренировку',
-        progress: 0,
-        target: 1,
-        completed: false,
-        rarity: 'common',
-      },
-      {
-        id: '8',
-        title: 'Активная неделя',
-        description: 'Занимайтесь спортом 5 дней в неделю',
-        icon: '💪',
-        category: 'sport',
-        requirement: '5 тренировок за неделю',
-        progress: 0,
-        target: 5,
-        completed: false,
-        rarity: 'rare',
-      },
-      {
-        id: '9',
-        title: 'Железный человек',
-        description: 'Занимайтесь спортом 30 дней подряд',
-        icon: '🏆',
-        category: 'sport',
-        requirement: '30 дней подряд с тренировками',
-        progress: 0,
-        target: 30,
-        completed: false,
-        rarity: 'legendary',
-      },
-
-      // Настроение
-      {
-        id: '10',
-        title: 'Первая запись',
-        description: 'Запишите своё настроение впервые',
-        icon: '😊',
-        category: 'mood',
-        requirement: 'Сделать 1 запись настроения',
-        progress: 0,
-        target: 1,
-        completed: false,
-        rarity: 'common',
-      },
-      {
-        id: '11',
-        title: 'Позитивный настрой',
-        description: 'Имейте высокое настроение 5 дней подряд',
-        icon: '🌈',
-        category: 'mood',
-        requirement: '5 дней с настроением 4+',
-        progress: 0,
-        target: 5,
-        completed: false,
-        rarity: 'epic',
-      },
-
-      // Серии
-      {
-        id: '12',
-        title: 'Новичок',
-        description: 'Используйте приложение 3 дня подряд',
-        icon: '⭐',
-        category: 'streak',
-        requirement: '3 дня подряд использования',
-        progress: 0,
-        target: 3,
-        completed: false,
-        rarity: 'common',
-      },
-      {
-        id: '13',
-        title: 'Постоянный клиент',
-        description: 'Используйте приложение 30 дней подряд',
-        icon: '🔥',
-        category: 'streak',
-        requirement: '30 дней подряд использования',
-        progress: 0,
-        target: 30,
-        completed: false,
-        rarity: 'epic',
-      },
-
-      // Общие
-      {
-        id: '14',
-        title: 'Мультитаскер',
-        description: 'Заполните все трекеры за один день',
-        icon: '🎯',
-        category: 'general',
-        requirement: 'Вода, сон, спорт и настроение за день',
-        progress: 0,
-        target: 4,
-        completed: false,
-        rarity: 'rare',
-      },
-      {
-        id: '15',
-        title: 'Мастер здоровья',
-        description: 'Получите все достижения',
-        icon: '👑',
-        category: 'general',
-        requirement: 'Получить все остальные достижения',
-        progress: 0,
-        target: 14,
-        completed: false,
-        rarity: 'legendary',
-      },
-    ];
-
-    // Загрузка прогресса из локального хранилища (заглушка)
-    const savedProgress = {}; // Здесь будет логика загрузки
-    setAchievements(initialAchievements);
+    loadAchievements();
   }, []);
 
-  // Фильтрация достижений
-  const filteredAchievements = achievements.filter(achievement => {
-    const matchesFilter = filter === 'all' || 
-      (filter === 'completed' && achievement.completed) ||
-      (filter === 'uncompleted' && !achievement.completed);
-    
-    const matchesCategory = categoryFilter === 'all' || achievement.category === categoryFilter;
-    
-    return matchesFilter && matchesCategory;
-  });
+  const loadAchievements = async () => {
+    const loadedAchievements = await achievementsService.loadAchievements();
+    setAchievements(loadedAchievements);
+    setUnlockedCount(loadedAchievements.filter(a => a.unlocked).length);
+    setTotalCount(loadedAchievements.length);
+  };
 
-  // Получение цвета редкости
-  const getRarityColor = (rarity: Achievement['rarity']) => {
-    switch (rarity) {
-      case 'common': return '#757575';
-      case 'rare': return '#2196F3';
-      case 'epic': return '#9C27B0';
-      case 'legendary': return '#FF9800';
-      default: return '#757575';
+  const resetAchievements = () => {
+    Alert.alert(
+      'Сбросить достижения?',
+      'Все ваши достижения будут сброшены. Это действие нельзя отменить.',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Сбросить',
+          style: 'destructive',
+          onPress: async () => {
+            const resetAchievements = await achievementsService.resetAchievements();
+            setAchievements(resetAchievements);
+            setUnlockedCount(0);
+            Alert.alert('✅ Сброшено', 'Все достижения сброшены');
+          },
+        },
+      ]
+    );
+  };
+
+  const categories = [
+    { id: 'all', name: 'Все', icon: '🏆', color: '#FFD700' },
+    { id: 'health', name: 'Здоровье', icon: '💚', color: '#4CAF50' },
+    { id: 'fitness', name: 'Фитнес', icon: '💪', color: '#FF5722' },
+    { id: 'mind', name: 'Разум', icon: '🧠', color: '#9C27B0' },
+  ];
+
+  const filteredAchievements = activeCategory === 'all' 
+    ? achievements 
+    : achievements.filter(a => a.category === activeCategory);
+
+  const unlockedInCategory = filteredAchievements.filter(a => a.unlocked).length;
+  const totalInCategory = filteredAchievements.length;
+  const progressInCategory = totalInCategory > 0 ? (unlockedInCategory / totalInCategory) * 100 : 0;
+
+  const AchievementCard = ({ achievement }: { achievement: Achievement }) => (
+    <View style={[
+      styles.achievementCard,
+      achievement.unlocked ? styles.unlockedCard : styles.lockedCard
+    ]}>
+      <View style={styles.achievementHeader}>
+        <View style={[
+          styles.achievementIconContainer,
+          { backgroundColor: achievement.unlocked ? getCategoryColor(achievement.category) : '#f0f0f0' }
+        ]}>
+          <Text style={[
+            styles.achievementIcon,
+            !achievement.unlocked && styles.lockedIcon
+          ]}>
+            {achievement.icon}
+          </Text>
+          {achievement.unlocked && (
+            <View style={styles.unlockedBadge}>
+              <Ionicons name="checkmark" size={12} color="#fff" />
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.achievementInfo}>
+          <Text style={[
+            styles.achievementTitle,
+            achievement.unlocked ? styles.unlockedText : styles.lockedText
+          ]}>
+            {achievement.title}
+          </Text>
+          <Text style={styles.achievementDescription}>
+            {achievement.description}
+          </Text>
+          
+          {achievement.unlocked && achievement.unlockedAt && (
+            <View style={styles.unlockedInfo}>
+              <Ionicons name="time-outline" size={12} color="#4CAF50" />
+              <Text style={styles.unlockedDate}>
+                {achievement.unlockedAt.toLocaleDateString('ru-RU', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                })}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.achievementStatus}>
+          {achievement.unlocked ? (
+            <Ionicons name="lock-open" size={24} color="#4CAF50" />
+          ) : (
+            <Ionicons name="lock-closed" size={24} color="#ccc" />
+          )}
+        </View>
+      </View>
+
+      {/* Прогресс для незаблокированных достижений */}
+      {!achievement.unlocked && (
+        <View style={styles.progressHint}>
+          <Text style={styles.progressHintText}>
+            {getProgressHint(achievement)}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const getCategoryColor = (category: string) => {
+    const categoryObj = categories.find(c => c.id === category);
+    return categoryObj ? categoryObj.color : '#666';
+  };
+
+  const getProgressHint = (achievement: Achievement) => {
+    switch (achievement.id) {
+      case 'first_sleep':
+        return 'Проспите 8 часов за одну ночь';
+      case 'first_water':
+        return 'Выпейте 2 литра воды за день';
+      case 'first_workout':
+        return 'Завершите любую тренировку';
+      case 'first_mood':
+        return 'Запишите свое настроение';
+      case 'weekly_goal':
+        return 'Занимайтесь 150 минут в неделю';
+      case 'perfect_week_sleep':
+        return 'Спите 7+ часов 7 дней подряд';
+      case 'hydration_master':
+        return 'Пейте 2+ литра воды 5 дней подряд';
+      case 'marathon':
+        return 'Пробегите 50+ км в сумме';
+      case 'streak_7':
+        return 'Тренируйтесь 7 дней подряд';
+      case 'positive_week':
+        return 'Оценивайте настроение на 4+ 7 дней подряд';
+      case 'mindful_month':
+        return 'Отслеживайте настроение 30 дней';
+      case 'happy_day':
+        return 'Оцените настроение на 5/5';
+      default:
+        return 'Продолжайте заниматься!';
     }
   };
-
-  // Получение иконки категории
-  const getCategoryIcon = (category: Achievement['category']) => {
-    switch (category) {
-      case 'water': return '💧';
-      case 'sleep': return '😴';
-      case 'sport': return '💪';
-      case 'mood': return '😊';
-      case 'streak': return '🔥';
-      case 'general': return '⭐';
-      default: return '⭐';
-    }
-  };
-
-  // Заглушка для тестирования - разблокировка достижения
-  const unlockAchievement = (id: string) => {
-    setAchievements(prev => prev.map(ach => 
-      ach.id === id 
-        ? { ...ach, completed: true, dateCompleted: new Date() }
-        : ach
-    ));
-    Alert.alert('🎉 Поздравляем!', 'Вы получили новое достижение!');
-  };
-
-  // Статистика
-  const completedCount = achievements.filter(a => a.completed).length;
-  const totalCount = achievements.length;
-  const completionPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Заголовок */}
         <View style={styles.header}>
-          <Ionicons name="trophy" size={36} color="#FFD700" />
-          <Text style={styles.title}>Достижения</Text>
+          <View style={styles.headerMain}>
+            <Ionicons name="trophy" size={36} color="#FFD700" />
+            <View style={styles.headerText}>
+              <Text style={styles.title}>Достижения</Text>
+              <Text style={styles.subtitle}>
+                {unlockedCount} из {totalCount} разблокировано
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.resetButton}
+            onPress={resetAchievements}
+          >
+            <Ionicons name="refresh" size={20} color="#666" />
+          </TouchableOpacity>
         </View>
 
-        {/* Прогресс */}
-        <View style={styles.progressCard}>
-          <Text style={styles.progressTitle}>Ваш прогресс</Text>
-          <View style={styles.progressRow}>
-            <View style={styles.progressCircle}>
-              <Text style={styles.progressPercent}>{completionPercent}%</Text>
+        {/* Общий прогресс */}
+        <View style={styles.overallProgress}>
+          <View style={styles.progressCircle}>
+            <Text style={styles.progressPercent}>
+              {Math.round((unlockedCount / totalCount) * 100)}%
+            </Text>
+            <Text style={styles.progressLabel}>Общий прогресс</Text>
+          </View>
+          <View style={styles.progressStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{unlockedCount}</Text>
+              <Text style={styles.statLabel}>Получено</Text>
             </View>
-            <View style={styles.progressStats}>
-              <Text style={styles.progressText}>
-                <Text style={styles.progressNumber}>{completedCount}</Text> из <Text style={styles.progressNumber}>{totalCount}</Text>
-              </Text>
-              <Text style={styles.progressSubtext}>достижений получено</Text>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{totalCount - unlockedCount}</Text>
+              <Text style={styles.statLabel}>Осталось</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{totalCount}</Text>
+              <Text style={styles.statLabel}>Всего</Text>
             </View>
           </View>
         </View>
 
-        {/* Фильтры */}
-        <View style={styles.filtersCard}>
-          <Text style={styles.filtersTitle}>Фильтры</Text>
-          
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>Статус:</Text>
-            {(['all', 'completed', 'uncompleted'] as const).map(status => (
+        {/* Категории */}
+        <View style={styles.categoriesSection}>
+          <Text style={styles.sectionTitle}>Категории</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesContainer}
+          >
+            {categories.map((category) => (
               <TouchableOpacity
-                key={status}
+                key={category.id}
                 style={[
-                  styles.filterButton,
-                  filter === status && styles.filterButtonActive,
+                  styles.categoryButton,
+                  activeCategory === category.id && styles.categoryButtonActive,
+                  { borderColor: category.color }
                 ]}
-                onPress={() => setFilter(status)}
+                onPress={() => setActiveCategory(category.id)}
               >
+                <Text style={styles.categoryIcon}>{category.icon}</Text>
                 <Text style={[
-                  styles.filterButtonText,
-                  filter === status && styles.filterButtonTextActive,
+                  styles.categoryName,
+                  activeCategory === category.id && { color: category.color }
                 ]}>
-                  {status === 'all' ? 'Все' : status === 'completed' ? 'Полученные' : 'Не полученные'}
+                  {category.name}
+                </Text>
+                <Text style={styles.categoryCount}>
+                  {achievements.filter(a => a.category === category.id && a.unlocked).length}/
+                  {achievements.filter(a => a.category === category.id).length}
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
-
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>Категория:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.categoryFilters}>
-                {(['all', 'water', 'sleep', 'sport', 'mood', 'streak', 'general'] as const).map(category => (
-                  <TouchableOpacity
-                    key={category}
-                    style={[
-                      styles.categoryButton,
-                      categoryFilter === category && styles.categoryButtonActive,
-                    ]}
-                    onPress={() => setCategoryFilter(category)}
-                  >
-                    <Text style={[
-                      styles.categoryButtonText,
-                      categoryFilter === category && styles.categoryButtonTextActive,
-                    ]}>
-                      {category === 'all' ? 'Все' : getCategoryIcon(category)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          </View>
+          </ScrollView>
         </View>
+
+        {/* Прогресс категории */}
+        {activeCategory !== 'all' && (
+          <View style={styles.categoryProgress}>
+            <View style={styles.categoryProgressHeader}>
+              <Text style={styles.categoryProgressTitle}>
+                {categories.find(c => c.id === activeCategory)?.name}
+              </Text>
+              <Text style={styles.categoryProgressStats}>
+                {unlockedInCategory} из {totalInCategory}
+              </Text>
+            </View>
+            <View style={styles.progressBarBackground}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { 
+                    width: `${progressInCategory}%`,
+                    backgroundColor: getCategoryColor(activeCategory)
+                  }
+                ]}
+              />
+            </View>
+          </View>
+        )}
 
         {/* Список достижений */}
         <View style={styles.achievementsList}>
           {filteredAchievements.length === 0 ? (
-            <Text style={styles.emptyText}>Нет достижений по выбранным фильтрам</Text>
+            <View style={styles.emptyState}>
+              <Ionicons name="trophy-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyStateTitle}>Нет достижений</Text>
+              <Text style={styles.emptyStateText}>
+                {activeCategory === 'all' 
+                  ? 'Начните использовать приложение, чтобы получать достижения!'
+                  : `В категории "${categories.find(c => c.id === activeCategory)?.name}" пока нет достижений`
+                }
+              </Text>
+            </View>
           ) : (
-            filteredAchievements.map(achievement => (
-              <View
+            filteredAchievements.map((achievement) => (
+              <AchievementCard
                 key={achievement.id}
-                style={[
-                  styles.achievementCard,
-                  achievement.completed && styles.achievementCardCompleted,
-                  { borderLeftColor: getRarityColor(achievement.rarity) },
-                ]}
-              >
-                <View style={styles.achievementHeader}>
-                  <Text style={styles.achievementIcon}>{achievement.icon}</Text>
-                  <View style={styles.achievementInfo}>
-                    <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                    <Text style={styles.achievementDescription}>{achievement.description}</Text>
-                    <View style={styles.achievementMeta}>
-                      <Text style={styles.achievementRarity} style={{ color: getRarityColor(achievement.rarity) }}>
-                        {achievement.rarity === 'common' ? 'Обычное' :
-                         achievement.rarity === 'rare' ? 'Редкое' :
-                         achievement.rarity === 'epic' ? 'Эпическое' : 'Легендарное'}
-                      </Text>
-                      <Text style={styles.achievementCategory}>
-                        {getCategoryIcon(achievement.category)} {achievement.category}
-                      </Text>
-                    </View>
-                  </View>
-                  {achievement.completed ? (
-                    <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
-                  ) : (
-                    <Ionicons name="lock-closed" size={32} color="#ccc" />
-                  )}
-                </View>
-
-                <View style={styles.achievementProgress}>
-                  <Text style={styles.achievementRequirement}>{achievement.requirement}</Text>
-                  <View style={styles.progressBar}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: `${Math.min((achievement.progress / achievement.target) * 100, 100)}%`,
-                          backgroundColor: getRarityColor(achievement.rarity),
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>
-                    {achievement.completed ? 'Получено' : `${achievement.progress}/${achievement.target}`}
-                  </Text>
-                </View>
-
-                {achievement.completed && achievement.dateCompleted && (
-                  <Text style={styles.completionDate}>
-                    Получено: {achievement.dateCompleted.toLocaleDateString('ru-RU')}
-                  </Text>
-                )}
-
-                {/* Кнопка для тестирования (убрать в продакшене) */}
-                {!achievement.completed && __DEV__ && (
-                  <TouchableOpacity
-                    style={styles.testButton}
-                    onPress={() => unlockAchievement(achievement.id)}
-                  >
-                    <Text style={styles.testButtonText}>Тест: разблокировать</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+                achievement={achievement}
+              />
             ))
           )}
         </View>
+
+        {/* Кнопка назад */}
+        <Link href="/" asChild>
+          <TouchableOpacity style={styles.backButton}>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+            <Text style={styles.backButtonText}>На главную</Text>
+          </TouchableOpacity>
+        </Link>
       </ScrollView>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -456,75 +319,131 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  headerMain: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 30,
-    justifyContent: 'center',
+    flex: 1,
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#333',
   },
-  progressCard: {
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 4,
+  },
+  resetButton: {
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  overallProgress: {
+    flexDirection: 'row',
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 20,
-    marginBottom: 20,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 3,
   },
-  progressTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
-  },
   progressCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#6200EE',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#FFF9C4',
+    marginRight: 20,
   },
   progressPercent: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  progressStats: {
-    flex: 1,
-  },
-  progressText: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
   },
-  progressNumber: {
-    color: '#6200EE',
-  },
-  progressSubtext: {
-    fontSize: 14,
+  progressLabel: {
+    fontSize: 12,
     color: '#666',
     marginTop: 4,
+    textAlign: 'center',
   },
-  filtersCard: {
+  progressStats: {
+    flex: 1,
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  categoriesSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  categoriesContainer: {
+    paddingRight: 20,
+  },
+  categoryButton: {
+    alignItems: 'center',
+    padding: 16,
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 20,
+    borderRadius: 16,
+    marginRight: 12,
+    minWidth: 100,
+    borderWidth: 2,
+    borderColor: '#f0f0f0',
+  },
+  categoryButtonActive: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 2,
+  },
+  categoryIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  categoryCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  categoryProgress: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 16,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -532,156 +451,158 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  filtersTitle: {
+  categoryProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  categoryProgressTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 15,
   },
-  filterRow: {
-    marginBottom: 15,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 8,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
-  },
-  filterButtonActive: {
-    backgroundColor: '#6200EE',
-  },
-  filterButtonText: {
+  categoryProgressStats: {
     fontSize: 14,
     color: '#666',
-  },
-  filterButtonTextActive: {
-    color: '#fff',
     fontWeight: '500',
   },
-  categoryFilters: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  progressBarBackground: {
+    height: 6,
     backgroundColor: '#f0f0f0',
+    borderRadius: 3,
+    overflow: 'hidden',
   },
-  categoryButtonActive: {
-    backgroundColor: '#6200EE',
-  },
-  categoryButtonText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  categoryButtonTextActive: {
-    color: '#fff',
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
   },
   achievementsList: {
-    marginBottom: 20,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#999',
-    fontSize: 16,
-    marginTop: 40,
+    gap: 12,
+    marginBottom: 24,
   },
   achievementCard: {
     backgroundColor: '#fff',
-    padding: 16,
     borderRadius: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
+    padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  achievementCardCompleted: {
-    opacity: 0.9,
+  unlockedCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  lockedCard: {
+    opacity: 0.8,
   },
   achievementHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 12,
+    alignItems: 'center',
+    gap: 16,
+  },
+  achievementIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
   achievementIcon: {
-    fontSize: 40,
+    fontSize: 24,
+  },
+  lockedIcon: {
+    opacity: 0.5,
+  },
+  unlockedBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   achievementInfo: {
     flex: 1,
   },
   achievementTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
     marginBottom: 4,
+  },
+  unlockedText: {
+    color: '#333',
+  },
+  lockedText: {
+    color: '#999',
   },
   achievementDescription: {
     fontSize: 14,
     color: '#666',
     marginBottom: 8,
+    lineHeight: 18,
   },
-  achievementMeta: {
+  unlockedInfo: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    gap: 4,
   },
-  achievementRarity: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  achievementCategory: {
-    fontSize: 12,
-    color: '#999',
-  },
-  achievementProgress: {
-    marginTop: 8,
-  },
-  achievementRequirement: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 3,
-    marginBottom: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  completionDate: {
+  unlockedDate: {
     fontSize: 12,
     color: '#4CAF50',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  testButton: {
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: '#ffeb3b',
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  testButtonText: {
-    fontSize: 12,
-    color: '#333',
     fontWeight: '500',
   },
+  achievementStatus: {
+    padding: 4,
+  },
+  progressHint: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFD700',
+  },
+  progressHintText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#999',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#ccc',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#6200EE',
+    padding: 16,
+    borderRadius: 12,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
-
-export default Achievements;

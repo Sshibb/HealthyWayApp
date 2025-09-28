@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { achievementsService } from '../achievements-service';
 
 // Тип для записи настроения
 interface MoodLog {
@@ -44,6 +45,7 @@ const Mood: React.FC = () => {
   const [selectedFactors, setSelectedFactors] = useState<string[]>([]);
   const [reason, setReason] = useState<string>('');
   const [logs, setLogs] = useState<MoodLog[]>([]);
+  const [hasFirstMoodRecord, setHasFirstMoodRecord] = useState(false);
 
   // Обработка выбора настроения
   const handleMoodSelect = (level: number) => {
@@ -60,7 +62,7 @@ const Mood: React.FC = () => {
   };
 
   // Сохранение записи
-  const saveMood = () => {
+  const saveMood = async () => {
     if (selectedMood === null) {
       Alert.alert('Выберите настроение');
       return;
@@ -76,7 +78,42 @@ const Mood: React.FC = () => {
     };
 
     setLogs((prev) => [newLog, ...prev]);
-    Alert.alert('✅ Сохранено', 'Ваше настроение записано!');
+    
+    // Проверка достижений для первой записи настроения
+    try {
+      const currentAchievements = await achievementsService.loadAchievements();
+      const updatedAchievements = achievementsService.checkMoodAchievement(currentAchievements);
+      await achievementsService.saveAchievements(updatedAchievements);
+      
+      // Показать уведомление о достижении, если это первая запись
+      if (logs.length === 0) {
+        const moodAchievement = updatedAchievements.find(a => a.id === 'first_mood' && a.unlocked);
+        const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_mood')?.unlocked === false;
+        
+        if (moodAchievement && wasJustUnlocked) {
+          Alert.alert(
+            '🎉 Поздравляем!', 
+            'Вы получили достижение "Эмоциональный старт"!\n\nВпервые записали своё настроение',
+            [
+              { 
+                text: 'Отлично!', 
+                style: 'default',
+                onPress: () => {
+                  setHasFirstMoodRecord(true);
+                  Alert.alert('✅ Сохранено', 'Ваше настроение записано!');
+                }
+              }
+            ]
+          );
+          return;
+        }
+      }
+      
+      Alert.alert('✅ Сохранено', 'Ваше настроение записано!');
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+      Alert.alert('✅ Сохранено', 'Ваше настроение записано!');
+    }
     
     // Сброс формы
     setSelectedMood(null);
@@ -103,6 +140,16 @@ const Mood: React.FC = () => {
           <Text style={styles.title}>Настроение</Text>
         </View>
 
+        {/* Баннер первого достижения */}
+        {logs.length === 0 && !hasFirstMoodRecord && (
+          <View style={styles.firstRecordBanner}>
+            <Ionicons name="trophy" size={24} color="#FFD700" />
+            <Text style={styles.firstRecordText}>
+              Запишите первое настроение и получите достижение!
+            </Text>
+          </View>
+        )}
+
         {/* Текущая запись */}
         <View style={styles.formCard}>
           <Text style={styles.sectionTitle}>Как вы себя чувствуете сегодня?</Text>
@@ -124,6 +171,11 @@ const Mood: React.FC = () => {
                   <Text style={[styles.moodEmoji, isSelected && styles.moodEmojiSelected]}>
                     {emoji}
                   </Text>
+                  {logs.length === 0 && level === 3 && !hasFirstMoodRecord && (
+                    <View style={styles.achievementHint}>
+                      <Text style={styles.achievementHintText}>🏆</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -169,15 +221,25 @@ const Mood: React.FC = () => {
           </View>
 
           {/* Кнопка сохранения */}
-          <TouchableOpacity style={styles.saveButton} onPress={saveMood}>
-            <Text style={styles.saveButtonText}>💾 Сохранить настроение</Text>
+          <TouchableOpacity 
+            style={[
+              styles.saveButton,
+              logs.length === 0 && !hasFirstMoodRecord && styles.firstSaveButton
+            ]} 
+            onPress={saveMood}
+          >
+            <Text style={styles.saveButtonText}>
+              {logs.length === 0 && !hasFirstMoodRecord ? '🏆 Записать первое настроение' : '💾 Сохранить настроение'}
+            </Text>
           </TouchableOpacity>
         </View>
 
         {/* История */}
         <View style={styles.historyCard}>
           <View style={styles.historyHeader}>
-            <Text style={styles.historyTitle}>История настроений</Text>
+            <Text style={styles.historyTitle}>
+              История настроений {logs.length > 0 && `(${logs.length})`}
+            </Text>
             {logs.length > 0 && (
               <TouchableOpacity onPress={() => setLogs([])}>
                 <Text style={styles.resetText}>Очистить</Text>
@@ -188,11 +250,20 @@ const Mood: React.FC = () => {
           {logs.length === 0 ? (
             <Text style={styles.emptyHistory}>Еще нет записей настроения</Text>
           ) : (
-            logs.map((log) => (
-              <View key={log.id} style={styles.historyItem}>
+            logs.map((log, index) => (
+              <View key={log.id} style={[
+                styles.historyItem,
+                index === 0 && logs.length === 1 && styles.firstHistoryItem
+              ]}>
                 <View style={styles.historyHeaderRow}>
                   <Text style={styles.historyEmoji}>{log.moodEmoji}</Text>
                   <Text style={styles.historyTime}>{formatDate(log.timestamp)}</Text>
+                  {index === 0 && logs.length === 1 && (
+                    <View style={styles.firstRecordIndicator}>
+                      <Ionicons name="trophy" size={16} color="#FFD700" />
+                      <Text style={styles.firstRecordIndicatorText}>Первая запись</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.historyReason}>{log.reason}</Text>
                 <View style={styles.historyFactors}>
@@ -227,12 +298,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#333',
+  },
+  firstRecordBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFF9C4',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    width: '100%',
+  },
+  firstRecordText: {
+    fontSize: 14,
+    color: '#5D4037',
+    fontWeight: '600',
+    flex: 1,
   },
   formCard: {
     width: '100%',
@@ -265,6 +354,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
   moodButtonSelected: {
     backgroundColor: '#FFD54F',
@@ -276,6 +366,19 @@ const styles = StyleSheet.create({
   },
   moodEmojiSelected: {
     fontSize: 32,
+  },
+  achievementHint: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#FFD700',
+    borderRadius: 8,
+    padding: 2,
+  },
+  achievementHintText: {
+    fontSize: 10,
+    color: '#333',
+    fontWeight: 'bold',
   },
   inputLabel: {
     fontSize: 16,
@@ -327,6 +430,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
+  firstSaveButton: {
+    backgroundColor: '#FFD700',
+    borderWidth: 2,
+    borderColor: '#FF9800',
+  },
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
@@ -370,6 +478,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  firstHistoryItem: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFD700',
+    backgroundColor: '#FFF9C4',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
   historyHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -382,6 +497,21 @@ const styles = StyleSheet.create({
   historyTime: {
     fontSize: 14,
     color: '#888',
+  },
+  firstRecordIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 'auto',
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  firstRecordIndicatorText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '600',
   },
   historyReason: {
     fontSize: 16,

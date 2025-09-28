@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { achievementsService } from './achievements-service';
 
 // Тип для записи сна
 interface SleepLog {
@@ -35,7 +36,7 @@ const Sleep: React.FC = () => {
   const progress = Math.min(avgDuration / GOAL_HOURS, 1);
 
   // Добавить запись сна
-  const addSleepLog = () => {
+  const addSleepLog = async () => {
     if (tempStart >= tempEnd) {
       Alert.alert('Ошибка', 'Время пробуждения должно быть позже времени засыпания');
       return;
@@ -52,6 +53,33 @@ const Sleep: React.FC = () => {
     };
 
     setLogs((prev) => [...prev, newLog]);
+
+    // Проверка достижений
+    try {
+      const currentAchievements = await achievementsService.loadAchievements();
+      const updatedAchievements = achievementsService.checkSleepAchievement(
+        durationHours, 
+        currentAchievements
+      );
+      await achievementsService.saveAchievements(updatedAchievements);
+      
+      // Показать уведомление о достижении, если разблокировано
+      if (durationHours >= 8) {
+        const sleepAchievement = updatedAchievements.find(a => a.id === 'first_sleep' && a.unlocked);
+        const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_sleep')?.unlocked === false;
+        
+        if (sleepAchievement && wasJustUnlocked) {
+          Alert.alert(
+            '🎉 Поздравляем!', 
+            'Вы получили достижение "Хороший сон"!\n\nВпервые проспали 8 часов',
+            [{ text: 'Отлично!', style: 'default' }]
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+    }
+
     Alert.alert('✅ Успешно', `Записано: ${durationHours.toFixed(1)} часов сна`);
   };
 
@@ -86,6 +114,14 @@ const Sleep: React.FC = () => {
     });
   };
 
+  // Получить цвет прогресс-бара в зависимости от продолжительности сна
+  const getProgressBarColor = () => {
+    if (avgDuration >= 7 && avgDuration <= 9) return '#4CAF50'; // Оптимальный сон
+    if (avgDuration >= 6 && avgDuration < 7) return '#FF9800'; // Нормальный сон
+    if (avgDuration >= 5 && avgDuration < 6) return '#FF5722'; // Недостаточный сон
+    return '#f44336'; // Нехватка сна
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -106,12 +142,25 @@ const Sleep: React.FC = () => {
           {/* Полоса прогресса */}
           <View style={styles.progressBarBackground}>
             <View
-           style={[
+              style={[
                 styles.progressBarFill,
-                { width: `${progress * 100}%` },
+                { 
+                  width: `${progress * 100}%`,
+                  backgroundColor: getProgressBarColor()
+                },
               ]}
             />
           </View>
+
+          {/* Подсказка про достижение */}
+          {logs.length === 0 && (
+            <View style={styles.achievementHint}>
+              <Ionicons name="trophy" size={16} color="#FFD700" />
+              <Text style={styles.achievementHintText}>
+                Проспите 8 часов, чтобы получить достижение!
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Ввод времени сна */}
@@ -134,6 +183,19 @@ const Sleep: React.FC = () => {
               <Text style={styles.timeButtonText}>Проснулся в</Text>
               <Text style={styles.timeValue}>{formatTime(tempEnd)}</Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Предварительный расчет продолжительности */}
+          <View style={styles.previewContainer}>
+            <Text style={styles.previewText}>
+              Продолжительность: {((tempEnd.getTime() - tempStart.getTime()) / (1000 * 60 * 60)).toFixed(1)} часов
+            </Text>
+            {((tempEnd.getTime() - tempStart.getTime()) / (1000 * 60 * 60)) >= 8 && (
+              <View style={styles.achievementBadge}>
+                <Ionicons name="trophy" size={14} color="#FFD700" />
+                <Text style={styles.achievementBadgeText}>Достижение!</Text>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity style={styles.addButton} onPress={addSleepLog}>
@@ -159,15 +221,27 @@ const Sleep: React.FC = () => {
               .slice()
               .reverse()
               .map((log) => (
-                <View key={log.id} style={styles.historyItem}>
+                <View key={log.id} style={[
+                  styles.historyItem,
+                  log.durationHours >= 8 && styles.achievementHistoryItem
+                ]}>
                   <View>
                     <Text style={styles.historyDate}>{formatDate(log.sleepStart)}</Text>
                     <Text style={styles.historyTime}>
                       {formatTime(log.sleepStart)} – {formatTime(log.sleepEnd)}
                     </Text>
+                    {log.durationHours >= 8 && (
+                      <View style={styles.achievementIndicator}>
+                        <Ionicons name="trophy" size={12} color="#FFD700" />
+                        <Text style={styles.achievementIndicatorText}>8+ часов</Text>
+                      </View>
+                    )}
                   </View>
                   <View style={styles.historyDurationContainer}>
-                    <Text style={styles.historyDuration}>
+                    <Text style={[
+                      styles.historyDuration,
+                      log.durationHours >= 8 && styles.achievementDuration
+                    ]}>
                       {log.durationHours.toFixed(1)} ч
                     </Text>
                     <TouchableOpacity onPress={() => deleteLog(log.id)}>
@@ -179,7 +253,7 @@ const Sleep: React.FC = () => {
           )}
         </View>
 
-                {/* DateTimePickers */}
+        {/* DateTimePickers */}
         {showStartTimePicker && (
           <DateTimePicker
             value={tempStart}
@@ -269,11 +343,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
+    marginBottom: 10,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#6200EE',
     borderRadius: 5,
+  },
+  achievementHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: '#FFF9C4',
+    borderRadius: 12,
+    marginTop: 10,
+  },
+  achievementHintText: {
+    fontSize: 14,
+    color: '#5D4037',
+    fontWeight: '500',
   },
   inputSection: {
     width: '100%',
@@ -316,6 +404,34 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '500',
     color: '#333',
+  },
+  previewContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  previewText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  achievementBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#FFF9C4',
+    borderRadius: 8,
+  },
+  achievementBadgeText: {
+    fontSize: 12,
+    color: '#5D4037',
+    fontWeight: '600',
   },
   addButton: {
     backgroundColor: '#6200EE',
@@ -367,6 +483,10 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  achievementHistoryItem: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFD700',
+  },
   historyDate: {
     fontSize: 16,
     fontWeight: '600',
@@ -377,6 +497,17 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
+  achievementIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  achievementIndicatorText: {
+    fontSize: 12,
+    color: '#FFD700',
+    fontWeight: '600',
+  },
   historyDurationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -386,6 +517,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#6200EE',
+  },
+  achievementDuration: {
+    color: '#FFD700',
+    fontWeight: 'bold',
   },
 });
 

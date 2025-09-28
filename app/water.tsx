@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { achievementService } from './achievement-service';
+import { achievementsService } from './achievements-service';
 
 // Типы
 interface WaterLog {
@@ -20,33 +20,10 @@ interface WaterLog {
 
 const GOAL_ML = 2000; // Цель — 2 литра в день
 
-// Генерируем часы с 6 утра до 10 вечера
-const HOURS = Array.from({ length: 17 }, (_, i) => 6 + i); // 6, 7, ..., 22
-
 const Water: React.FC = () => {
   const [logs, setLogs] = useState<WaterLog[]>([]);
   const totalConsumed = logs.reduce((sum, log) => sum + log.amount, 0);
   const progress = Math.min(totalConsumed / GOAL_ML, 1);
-
-  // Группируем логи по часам
-  const hourlyData = useMemo(() => {
-    const data: Record<number, number> = {};
-    HOURS.forEach((hour) => {
-      data[hour] = 0;
-    });
-
-    logs.forEach((log) => {
-      const hour = log.timestamp.getHours();
-      if (HOURS.includes(hour)) {
-        data[hour] += log.amount;
-      }
-    });
-
-    return data;
-  }, [logs]);
-
-  // Максимальное значение для масштабирования
-  const maxAmount = Math.max(...Object.values(hourlyData), 1);
 
   const addWater = async (amount: number) => {
     const newLog: WaterLog = {
@@ -54,26 +31,34 @@ const Water: React.FC = () => {
       amount,
       timestamp: new Date(),
     };
-    setLogs((prev) => [...prev, newLog]);
     
-    // Отправляем данные в сервис достижений
+    const newTotal = totalConsumed + amount;
+    setLogs((prev) => [...prev, newLog]);
+
+    // Проверка достижений
     try {
-      const { unlocked } = await achievementService.updateProgress({
-        water: {
-          amount: amount,
-          date: new Date(),
-        },
-      });
+      const currentAchievements = await achievementsService.loadAchievements();
+      const updatedAchievements = achievementsService.checkWaterAchievement(
+        newTotal, 
+        currentAchievements
+      );
+      await achievementsService.saveAchievements(updatedAchievements);
       
-      if (unlocked.length > 0) {
-        // Показываем уведомление о новых достижениях
-        unlocked.forEach(achievement => {
-          Alert.alert('🎉 Новое достижение!', 
-            `"${achievement.title}"\n\n${achievement.description}`);
-        });
+      // Показать уведомление о достижении, если разблокировано
+      if (newTotal >= 2000) {
+        const waterAchievement = updatedAchievements.find(a => a.id === 'first_water' && a.unlocked);
+        const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_water')?.unlocked === false;
+        
+        if (waterAchievement && wasJustUnlocked) {
+          Alert.alert(
+            '🎉 Поздравляем!', 
+            'Вы получили достижение "Водохлёб"!\n\nВпервые выпили 2 литра воды за день',
+            [{ text: 'Отлично!', style: 'default' }]
+          );
+        }
       }
     } catch (error) {
-      console.error('Error updating achievements:', error);
+      console.error('Error checking achievements:', error);
     }
   };
 
@@ -95,6 +80,14 @@ const Water: React.FC = () => {
     });
   };
 
+  // Получить цвет прогресс-бара в зависимости от потребления воды
+  const getProgressBarColor = () => {
+    if (totalConsumed >= 2000) return '#4CAF50'; // Цель достигнута
+    if (totalConsumed >= 1500) return '#8BC34A'; // Близко к цели
+    if (totalConsumed >= 1000) return '#FFC107'; // Среднее потребление
+    return '#FF9800'; // Нужно больше воды
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -113,36 +106,29 @@ const Water: React.FC = () => {
             <View
               style={[
                 styles.progressBarFill,
-                { width: `${progress * 100}%` },
+                { 
+                  width: `${progress * 100}%`,
+                  backgroundColor: getProgressBarColor()
+                },
               ]}
             />
           </View>
-        </View>
 
-        {/* График */}
-        <View style={styles.chartContainer}>
-          <Text style={styles.chartTitle}>Ваш график сегодня</Text>
-          <View style={styles.chart}>
-            {HOURS.map((hour) => {
-              const amount = hourlyData[hour];
-              const heightPercent = (amount / maxAmount) * 100;
-              const opacity = amount > 0 ? 1 : 0.3;
-              return (
-                <View key={hour} style={styles.barContainer}>
-                  <View
-                    style={[
-                      styles.bar,
-                      {
-                        height: Math.max(heightPercent, 5), // минимум 5% чтобы был виден
-                        backgroundColor: `rgba(76, 175, 80, ${opacity})`,
-                      },
-                    ]}
-                  />
-                  <Text style={styles.barLabel}>{hour}:00</Text>
-                </View>
-              );
-            })}
-          </View>
+          {/* Подсказка про достижение */}
+          {totalConsumed < 2000 && (
+            <View style={styles.achievementHint}>
+              <Text style={styles.achievementHintText}>
+                🏆 Выпейте 2 литра для получения достижения!
+              </Text>
+            </View>
+          )}
+
+          {/* Бейдж достижения */}
+          {totalConsumed >= 2000 && (
+            <View style={styles.achievementUnlocked}>
+              <Text style={styles.achievementUnlockedText}>🎉 Достижение разблокировано!</Text>
+            </View>
+          )}
         </View>
 
         {/* Кнопки добавления */}
@@ -150,10 +136,16 @@ const Water: React.FC = () => {
           {[250, 500, 750, 1000].map((amount) => (
             <TouchableOpacity
               key={amount}
-              style={styles.addButton}
+              style={[
+                styles.addButton,
+                totalConsumed + amount >= 2000 && styles.achievementButton
+              ]}
               onPress={() => addWater(amount)}
             >
               <Text style={styles.addButtonText}>+{amount} мл</Text>
+              {totalConsumed + amount >= 2000 && totalConsumed < 2000 && (
+                <Text style={styles.achievementBadge}>🏆</Text>
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -173,22 +165,39 @@ const Water: React.FC = () => {
             logs
               .slice()
               .reverse()
-              .map((log) => (
-                <View key={log.id} style={styles.historyItem}>
-                  <Text style={styles.historyAmount}>{log.amount} мл</Text>
-                  <Text style={styles.historyTime}>
-                    {formatTime(log.timestamp)}
-                  </Text>
-                </View>
-              ))
+              .map((log) => {
+                const cumulativeAmount = logs
+                  .filter(l => l.timestamp <= log.timestamp)
+                  .reduce((sum, l) => sum + l.amount, 0);
+                
+                return (
+                  <View key={log.id} style={[
+                    styles.historyItem,
+                    cumulativeAmount >= 2000 && styles.achievementHistoryItem
+                  ]}>
+                    <View style={styles.historyContent}>
+                      <Text style={styles.historyAmount}>{log.amount} мл</Text>
+                      <Text style={styles.historyTime}>
+                        {formatTime(log.timestamp)}
+                      </Text>
+                      {cumulativeAmount >= 2000 && (
+                        <View style={styles.achievementIndicator}>
+                          <Text style={styles.achievementIndicatorText}>🏆 2л достигнуто!</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.cumulativeText}>
+                      Всего: {(cumulativeAmount / 1000).toFixed(1)}л
+                    </Text>
+                  </View>
+                );
+              })
           )}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
-
-const { width } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
@@ -208,6 +217,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     alignItems: 'center',
     marginVertical: 30,
+    width: '100%',
   },
   progressAmount: {
     fontSize: 36,
@@ -225,51 +235,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
     borderRadius: 6,
     overflow: 'hidden',
+    marginBottom: 10,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#4CAF50',
     borderRadius: 6,
   },
-  chartContainer: {
-    width: '100%',
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 20,
-    marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
+  achievementHint: {
+    padding: 12,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 12,
+    marginTop: 10,
+    borderWidth: 2,
+    borderColor: '#2196F3',
   },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 20,
+  achievementHintText: {
+    fontSize: 14,
+    color: '#1976D2',
+    fontWeight: '500',
     textAlign: 'center',
   },
-  chart: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 150,
-    paddingHorizontal: 10,
+  achievementUnlocked: {
+    padding: 12,
+    backgroundColor: '#C8E6C9',
+    borderRadius: 12,
+    marginTop: 10,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
   },
-  barContainer: {
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 2,
-  },
-  bar: {
-    width: (width - 80) / 17 - 8, // адаптивная ширина
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  barLabel: {
-    fontSize: 10,
-    color: '#666',
+  achievementUnlockedText: {
+    fontSize: 14,
+    color: '#2E7D32',
+    fontWeight: '600',
     textAlign: 'center',
   },
   buttonsContainer: {
@@ -286,11 +283,23 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     minWidth: 120,
     alignItems: 'center',
+    position: 'relative',
+  },
+  achievementButton: {
+    backgroundColor: '#2196F3',
+    borderWidth: 2,
+    borderColor: '#FFD700',
   },
   addButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  achievementBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    fontSize: 16,
   },
   historyContainer: {
     width: '100%',
@@ -312,8 +321,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   historyItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: '#fff',
@@ -325,6 +332,16 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  achievementHistoryItem: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+    backgroundColor: '#E3F2FD',
+  },
+  historyContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   historyAmount: {
     fontSize: 16,
     fontWeight: '500',
@@ -333,6 +350,24 @@ const styles = StyleSheet.create({
   historyTime: {
     fontSize: 14,
     color: '#666',
+  },
+  achievementIndicator: {
+    marginTop: 8,
+    padding: 4,
+    backgroundColor: '#FFD700',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  achievementIndicatorText: {
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '600',
+  },
+  cumulativeText: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
+    textAlign: 'right',
   },
   emptyHistory: {
     textAlign: 'center',
