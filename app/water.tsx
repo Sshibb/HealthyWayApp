@@ -36,31 +36,39 @@ const Water: React.FC = () => {
     setLogs((prev) => [...prev, newLog]);
 
     // Проверка достижений
-    try {
-      const currentAchievements = await achievementsService.loadAchievements();
-      const updatedAchievements = achievementsService.checkWaterAchievement(
-        newTotal, 
-        currentAchievements
+    // Проверка достижений
+try {
+  const currentAchievements = await achievementsService.loadAchievements();
+  
+  // Рассчитываем статистику для воды
+  const totalWater = logs.reduce((sum, log) => sum + log.amount, 0) + amount;
+  const waterDays = logs.filter(log => log.amount >= 2000).length + (newTotal >= 2000 ? 1 : 0);
+
+  const updatedAchievements = achievementsService.checkWaterAchievement(
+    newTotal, 
+    totalWater,
+    waterDays,
+    currentAchievements
+  );
+  await achievementsService.saveAchievements(updatedAchievements);
+  
+  // Показать уведомление о достижении, если разблокировано
+  if (newTotal >= 2000) {
+    const waterAchievement = updatedAchievements.find(a => a.id === 'first_water' && a.unlocked);
+    const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_water')?.unlocked === false;
+    
+    if (waterAchievement && wasJustUnlocked) {
+      Alert.alert(
+        '🎉 Поздравляем!', 
+        'Вы получили достижение "Водохлёб"!\n\nВпервые выпили 2 литра воды за день',
+        [{ text: 'Отлично!', style: 'default' }]
       );
-      await achievementsService.saveAchievements(updatedAchievements);
-      
-      // Показать уведомление о достижении, если разблокировано
-      if (newTotal >= 2000) {
-        const waterAchievement = updatedAchievements.find(a => a.id === 'first_water' && a.unlocked);
-        const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_water')?.unlocked === false;
-        
-        if (waterAchievement && wasJustUnlocked) {
-          Alert.alert(
-            '🎉 Поздравляем!', 
-            'Вы получили достижение "Водохлёб"!\n\nВпервые выпили 2 литра воды за день',
-            [{ text: 'Отлично!', style: 'default' }]
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Error checking achievements:', error);
     }
-  };
+  }
+} catch (error) {
+  console.error('Error checking achievements:', error);
+}
+  }
 
   const resetLogs = () => {
     Alert.alert(
@@ -376,5 +384,4 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
-
 export default Water;

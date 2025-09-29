@@ -1,4 +1,3 @@
-// app/achievements.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -19,6 +18,7 @@ const { width } = Dimensions.get('window');
 export default function AchievementsScreen() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'common' | 'rare' | 'epic' | 'legendary'>('all');
   const [unlockedCount, setUnlockedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -58,15 +58,113 @@ export default function AchievementsScreen() {
     { id: 'health', name: 'Здоровье', icon: '💚', color: '#4CAF50' },
     { id: 'fitness', name: 'Фитнес', icon: '💪', color: '#FF5722' },
     { id: 'mind', name: 'Разум', icon: '🧠', color: '#9C27B0' },
+    { id: 'dedication', name: 'Преданность', icon: '🔥', color: '#FF9800' },
+    { id: 'special', name: 'Особые', icon: '🎪', color: '#E91E63' },
   ];
 
-  const filteredAchievements = activeCategory === 'all' 
-    ? achievements 
-    : achievements.filter(a => a.category === activeCategory);
+  const rarityFilters = [
+    { id: 'all', name: 'Все', color: '#666' },
+    { id: 'common', name: 'Обычные', color: '#6B7280' },
+    { id: 'rare', name: 'Редкие', color: '#3B82F6' },
+    { id: 'epic', name: 'Эпические', color: '#8B5CF6' },
+    { id: 'legendary', name: 'Легендарные', color: '#F59E0B' },
+  ];
+
+  const filteredAchievements = achievements.filter(achievement => {
+    const categoryMatch = activeCategory === 'all' || achievement.category === activeCategory;
+    const rarityMatch = activeFilter === 'all' || achievement.rarity === activeFilter;
+    return categoryMatch && rarityMatch;
+  });
 
   const unlockedInCategory = filteredAchievements.filter(a => a.unlocked).length;
   const totalInCategory = filteredAchievements.length;
   const progressInCategory = totalInCategory > 0 ? (unlockedInCategory / totalInCategory) * 100 : 0;
+
+  const getCategoryColor = (category: string) => {
+    const categoryObj = categories.find(c => c.id === category);
+    return categoryObj ? categoryObj.color : '#666';
+  };
+
+  const getProgressHint = (achievement: Achievement) => {
+    switch (achievement.id) {
+      // Здоровье
+      case 'first_sleep':
+        return 'Проспите 8 часов за одну ночь';
+      case 'first_water':
+        return 'Выпейте 2 литра воды за день';
+      case 'perfect_week_sleep':
+        return 'Спите 7+ часов 7 дней подряд';
+      case 'hydration_master':
+        return 'Пейте 2+ литра воды 5 дней подряд';
+      case 'sleep_expert':
+        return 'Наберите 100 часов качественного сна';
+      case 'water_expert':
+        return 'Выпейте 100 литров воды в сумме';
+      case 'sleep_marathon':
+        return 'Отслеживайте сон 30 дней подряд';
+      
+      // Фитнес
+      case 'first_workout':
+        return 'Завершите любую тренировку';
+      case 'weekly_goal':
+        return 'Занимайтесь 150 минут в неделю';
+      case 'marathon':
+        return 'Пробегите 50+ км в сумме';
+      case 'streak_7':
+        return 'Тренируйтесь 7 дней подряд';
+      case 'iron_man':
+        return 'Попробуйте 10 различных типов тренировок';
+      case 'fitness_pro':
+        return 'Завершите 100 тренировок';
+      case 'early_bird':
+        return 'Потренируйтесь до 7 утра';
+      case 'night_owl':
+        return 'Потренируйтесь после 10 вечера';
+      
+      // Разум
+      case 'first_mood':
+        return 'Запишите свое настроение';
+      case 'positive_week':
+        return 'Оценивайте настроение на 4+ 7 дней подряд';
+      case 'mindful_month':
+        return 'Отслеживайте настроение 30 дней';
+      case 'happy_day':
+        return 'Оцените настроение на 5/5';
+      case 'emotional_explorer':
+        return 'Используйте все 5 уровней настроения';
+      case 'zen_master':
+        return 'Занимайтесь йогой/медитацией 50 раз';
+      
+      // Преданность
+      case 'week_streak':
+        return 'Используйте приложение 7 дней подряд';
+      case 'month_streak':
+        return 'Используйте приложение 30 дней подряд';
+      case 'triple_streak':
+        return 'Отслеживайте сон, воду и настроение 7 дней подряд';
+      case 'perfect_day':
+        return 'Сон 8ч + вода 2л + тренировка + настроение 4+ за один день';
+      case 'health_guru':
+        return 'Используйте приложение 100 дней';
+      
+      // Особые
+      case 'first_achievement':
+        return 'Получите любое достижение';
+      case 'halfway_there':
+        return 'Разблокируйте 50% всех достижений';
+      case 'completionist':
+        return 'Разблокируйте все достижения';
+      case 'weekend_warrior':
+        return 'Тренируйтесь только по выходным 4 недели подряд';
+      case 'four_seasons':
+        return 'Используйте приложение 90 дней подряд';
+      case 'early_adopter':
+        return 'Будьте среди первых пользователей приложения';
+      
+      default:
+        return 'Продолжайте заниматься!';
+    }
+  };
 
   const AchievementCard = ({ achievement }: { achievement: Achievement }) => (
     <View style={[
@@ -92,12 +190,23 @@ export default function AchievementsScreen() {
         </View>
         
         <View style={styles.achievementInfo}>
-          <Text style={[
-            styles.achievementTitle,
-            achievement.unlocked ? styles.unlockedText : styles.lockedText
-          ]}>
-            {achievement.title}
-          </Text>
+          <View style={styles.achievementTitleRow}>
+            <Text style={[
+              styles.achievementTitle,
+              achievement.unlocked ? styles.unlockedText : styles.lockedText
+            ]}>
+              {achievement.title}
+            </Text>
+            <View style={[
+              styles.rarityBadge,
+              { backgroundColor: achievementsService.getRarityColor(achievement.rarity) }
+            ]}>
+              <Text style={styles.rarityBadgeText}>
+                {achievementsService.getRarityName(achievement.rarity)}
+              </Text>
+            </View>
+          </View>
+          
           <Text style={styles.achievementDescription}>
             {achievement.description}
           </Text>
@@ -128,6 +237,7 @@ export default function AchievementsScreen() {
       {/* Прогресс для незаблокированных достижений */}
       {!achievement.unlocked && (
         <View style={styles.progressHint}>
+          <Ionicons name="bulb-outline" size={14} color="#FFD700" />
           <Text style={styles.progressHintText}>
             {getProgressHint(achievement)}
           </Text>
@@ -135,42 +245,6 @@ export default function AchievementsScreen() {
       )}
     </View>
   );
-
-  const getCategoryColor = (category: string) => {
-    const categoryObj = categories.find(c => c.id === category);
-    return categoryObj ? categoryObj.color : '#666';
-  };
-
-  const getProgressHint = (achievement: Achievement) => {
-    switch (achievement.id) {
-      case 'first_sleep':
-        return 'Проспите 8 часов за одну ночь';
-      case 'first_water':
-        return 'Выпейте 2 литра воды за день';
-      case 'first_workout':
-        return 'Завершите любую тренировку';
-      case 'first_mood':
-        return 'Запишите свое настроение';
-      case 'weekly_goal':
-        return 'Занимайтесь 150 минут в неделю';
-      case 'perfect_week_sleep':
-        return 'Спите 7+ часов 7 дней подряд';
-      case 'hydration_master':
-        return 'Пейте 2+ литра воды 5 дней подряд';
-      case 'marathon':
-        return 'Пробегите 50+ км в сумме';
-      case 'streak_7':
-        return 'Тренируйтесь 7 дней подряд';
-      case 'positive_week':
-        return 'Оценивайте настроение на 4+ 7 дней подряд';
-      case 'mindful_month':
-        return 'Отслеживайте настроение 30 дней';
-      case 'happy_day':
-        return 'Оцените настроение на 5/5';
-      default:
-        return 'Продолжайте заниматься!';
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -252,6 +326,35 @@ export default function AchievementsScreen() {
           </ScrollView>
         </View>
 
+        {/* Фильтры редкости */}
+        <View style={styles.raritySection}>
+          <Text style={styles.sectionTitle}>Редкость</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.rarityContainer}
+          >
+            {rarityFilters.map((filter) => (
+              <TouchableOpacity
+                key={filter.id}
+                style={[
+                  styles.rarityButton,
+                  activeFilter === filter.id && styles.rarityButtonActive,
+                  { backgroundColor: filter.color + '20', borderColor: filter.color }
+                ]}
+                onPress={() => setActiveFilter(filter.id as any)}
+              >
+                <Text style={[
+                  styles.rarityText,
+                  activeFilter === filter.id && { color: filter.color, fontWeight: '600' }
+                ]}>
+                  {filter.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
         {/* Прогресс категории */}
         {activeCategory !== 'all' && (
           <View style={styles.categoryProgress}>
@@ -277,17 +380,22 @@ export default function AchievementsScreen() {
           </View>
         )}
 
+        {/* Статистика фильтров */}
+        <View style={styles.filterStats}>
+          <Text style={styles.filterStatsText}>
+            Показано: {filteredAchievements.length} достижений
+            {unlockedInCategory > 0 && ` (${unlockedInCategory} разблокировано)`}
+          </Text>
+        </View>
+
         {/* Список достижений */}
         <View style={styles.achievementsList}>
           {filteredAchievements.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="trophy-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyStateTitle}>Нет достижений</Text>
+              <Ionicons name="search-outline" size={64} color="#ccc" />
+              <Text style={styles.emptyStateTitle}>Достижения не найдены</Text>
               <Text style={styles.emptyStateText}>
-                {activeCategory === 'all' 
-                  ? 'Начните использовать приложение, чтобы получать достижения!'
-                  : `В категории "${categories.find(c => c.id === activeCategory)?.name}" пока нет достижений`
-                }
+                Попробуйте изменить фильтры или категорию
               </Text>
             </View>
           ) : (
@@ -401,7 +509,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   categoriesSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 20,
@@ -440,11 +548,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
+  raritySection: {
+    marginBottom: 20,
+  },
+  rarityContainer: {
+    paddingRight: 20,
+  },
+  rarityButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    marginRight: 8,
+  },
+  rarityButtonActive: {
+    borderWidth: 3,
+  },
+  rarityText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
   categoryProgress: {
     backgroundColor: '#fff',
     padding: 16,
     borderRadius: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -477,6 +606,16 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
+  filterStats: {
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  filterStatsText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   achievementsList: {
     gap: 12,
     marginBottom: 24,
@@ -500,7 +639,7 @@ const styles = StyleSheet.create({
   },
   achievementHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 16,
   },
   achievementIconContainer: {
@@ -531,16 +670,33 @@ const styles = StyleSheet.create({
   achievementInfo: {
     flex: 1,
   },
+  achievementTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 4,
+  },
   achievementTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
   },
   unlockedText: {
     color: '#333',
   },
   lockedText: {
     color: '#999',
+  },
+  rarityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  rarityBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: 'bold',
   },
   achievementDescription: {
     fontSize: 14,
@@ -568,15 +724,22 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: '#FFD700',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   progressHintText: {
     fontSize: 12,
     color: '#666',
     fontStyle: 'italic',
+    flex: 1,
   },
   emptyState: {
     alignItems: 'center',
     padding: 40,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginTop: 20,
   },
   emptyStateTitle: {
     fontSize: 18,

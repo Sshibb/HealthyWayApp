@@ -55,30 +55,39 @@ const Sleep: React.FC = () => {
     setLogs((prev) => [...prev, newLog]);
 
     // Проверка достижений
-    try {
-      const currentAchievements = await achievementsService.loadAchievements();
-      const updatedAchievements = achievementsService.checkSleepAchievement(
-        durationHours, 
-        currentAchievements
+    // Проверка достижений
+   // Проверка достижений
+try {
+  const currentAchievements = await achievementsService.loadAchievements();
+  
+  // Рассчитываем статистику для сна
+  const totalSleepHours = logs.reduce((sum, log) => sum + log.durationHours, 0) + durationHours;
+  const sleepDays = logs.filter(log => log.durationHours >= 8).length + (durationHours >= 8 ? 1 : 0);
+
+  const updatedAchievements = achievementsService.checkSleepAchievement(
+    durationHours, 
+    totalSleepHours,
+    sleepDays,
+    currentAchievements
+  );
+  await achievementsService.saveAchievements(updatedAchievements);
+  
+  // Показать уведомление о достижении, если разблокировано
+  if (durationHours >= 8) {
+    const sleepAchievement = updatedAchievements.find(a => a.id === 'first_sleep' && a.unlocked);
+    const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_sleep')?.unlocked === false;
+    
+    if (sleepAchievement && wasJustUnlocked) {
+      Alert.alert(
+        '🎉 Поздравляем!', 
+        'Вы получили достижение "Хороший сон"!\n\nВпервые проспали 8 часов',
+        [{ text: 'Отлично!', style: 'default' }]
       );
-      await achievementsService.saveAchievements(updatedAchievements);
-      
-      // Показать уведомление о достижении, если разблокировано
-      if (durationHours >= 8) {
-        const sleepAchievement = updatedAchievements.find(a => a.id === 'first_sleep' && a.unlocked);
-        const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_sleep')?.unlocked === false;
-        
-        if (sleepAchievement && wasJustUnlocked) {
-          Alert.alert(
-            '🎉 Поздравляем!', 
-            'Вы получили достижение "Хороший сон"!\n\nВпервые проспали 8 часов',
-            [{ text: 'Отлично!', style: 'default' }]
-          );
-        }
-      }
-    } catch (error) {
-      console.error('Error checking achievements:', error);
     }
+  }
+} catch (error) {
+  console.error('Error checking achievements:', error);
+}
 
     Alert.alert('✅ Успешно', `Записано: ${durationHours.toFixed(1)} часов сна`);
   };

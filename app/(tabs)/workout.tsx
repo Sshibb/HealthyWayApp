@@ -190,28 +190,40 @@ const Workout: React.FC = () => {
       const currentAchievements = await achievementsService.loadAchievements();
       
       // Проверка первой тренировки
-      if (totalWorkouts === 0) {
-        const updatedAchievements = currentAchievements.map(achievement => {
-          if (achievement.id === 'first_workout' && !achievement.unlocked) {
-            return {
-              ...achievement,
-              unlocked: true,
-              unlockedAt: new Date()
-            };
-          }
-          return achievement;
-        });
-        await achievementsService.saveAchievements(updatedAchievements);
-        
-        const workoutAchievement = updatedAchievements.find(a => a.id === 'first_workout' && a.unlocked);
-        if (workoutAchievement) {
-          Alert.alert(
-            '🎉 Поздравляем!', 
-            'Вы получили достижение "Спортивный старт"!\n\nПервая тренировка завершена',
-            [{ text: 'Отлично!', style: 'default' }]
-          );
-        }
-      }
+      // Рассчитываем статистику для тренировок
+const workoutTypes = new Set([...logs.map(log => log.type), selectedWorkout?.id]).size;
+
+const updatedAchievements = achievementsService.checkWorkoutAchievement(
+  totalWorkouts + 1,
+  weeklyMinutes + duration,
+  workoutTypes,
+  currentAchievements
+);
+await achievementsService.saveAchievements(updatedAchievements);
+
+// Проверка первой тренировки
+if (totalWorkouts === 0) {
+  const workoutAchievement = updatedAchievements.find(a => a.id === 'first_workout' && a.unlocked);
+  if (workoutAchievement) {
+    Alert.alert(
+      '🎉 Поздравляем!', 
+      'Вы получили достижение "Спортивный старт"!\n\nПервая тренировка завершена',
+      [{ text: 'Отлично!', style: 'default' }]
+    );
+  }
+}
+
+// Проверка недельной цели
+if (weeklyMinutes + duration >= weeklyGoal && weeklyMinutes < weeklyGoal) {
+  const weeklyAchievement = updatedAchievements.find(a => a.id === 'weekly_goal' && a.unlocked);
+  if (weeklyAchievement) {
+    Alert.alert(
+      '🎉 Отлично!', 
+      'Вы получили достижение "Активная неделя"!\n\nВыполнена недельная норма тренировок',
+      [{ text: 'Супер!', style: 'default' }]
+    );
+  }
+}
 
       // Проверка недельной цели
       if (weeklyMinutes + duration >= weeklyGoal && weeklyMinutes < weeklyGoal) {

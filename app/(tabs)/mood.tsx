@@ -81,9 +81,20 @@ const Mood: React.FC = () => {
     
     // Проверка достижений для первой записи настроения
     try {
-      const currentAchievements = await achievementsService.loadAchievements();
-      const updatedAchievements = achievementsService.checkMoodAchievement(currentAchievements);
-      await achievementsService.saveAchievements(updatedAchievements);
+  const currentAchievements = await achievementsService.loadAchievements();
+  
+  // Рассчитываем статистику для настроения
+  const moodLevel = selectedMood || 0;
+  const moodDays = logs.filter(log => log.moodLevel >= 4).length + (moodLevel >= 4 ? 1 : 0);
+  const totalMoodEntries = logs.length + 1;
+  
+  const updatedAchievements = achievementsService.checkMoodAchievement(
+    moodLevel,
+    moodDays,
+    totalMoodEntries,
+    currentAchievements
+  );
+  await achievementsService.saveAchievements(updatedAchievements);
       
       // Показать уведомление о достижении, если это первая запись
       if (logs.length === 0) {

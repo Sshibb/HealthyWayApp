@@ -59,32 +59,35 @@ export default function HomeScreen() {
   });
 
   // Заглушка для загрузки данных (в реальном приложении здесь будет AsyncStorage или API)
-  useEffect(() => {
-    // Симуляция загруженных данных
-    const mockData: HealthData = {
-      water: {
-        amount: 1250,
-        goal: 2000,
-        lastUpdate: new Date()
-      },
-      sleep: {
-        duration: 7.5,
-        goal: 8,
-        lastUpdate: new Date(Date.now() - 12 * 60 * 60 * 1000) // 12 часов назад
-      },
-      mood: {
-        level: 4,
-        emoji: '🙂',
-        lastUpdate: new Date(Date.now() - 6 * 60 * 60 * 1000) // 6 часов назад
-      },
-      workout: {
-        type: 'Бег',
-        duration: 45,
-        lastUpdate: new Date(Date.now() - 24 * 60 * 60 * 1000) // 1 день назад
-      }
-    };
-    setHealthData(mockData);
-  }, []);
+  // index.tsx
+// Заменим mockData в useEffect:
+
+useEffect(() => {
+  // Симуляция загруженных данных - все значения с 0
+  const mockData: HealthData = {
+    water: {
+      amount: 0, // было 1250
+      goal: 2000,
+      lastUpdate: new Date()
+    },
+    sleep: {
+      duration: 0, // было 7.5
+      goal: 8,
+      lastUpdate: new Date(Date.now() - 12 * 60 * 60 * 1000)
+    },
+    mood: {
+      level: 0, // было 4
+      emoji: '😐',
+      lastUpdate: new Date(Date.now() - 6 * 60 * 60 * 1000)
+    },
+    workout: {
+      type: '',
+      duration: 0, // было 45
+      lastUpdate: new Date(Date.now() - 24 * 60 * 60 * 1000)
+    }
+  };
+  setHealthData(mockData);
+}, []);
 
   // Расчет прогресса в процентах
   const getProgress = (current: number, goal: number) => {
@@ -139,6 +142,15 @@ export default function HomeScreen() {
                   <Text style={styles.actionEmoji}>😌</Text>
                 </View>
                 <Text style={styles.actionText}>Настроение</Text>
+              </TouchableOpacity>
+            </Link>
+
+            <Link href="/nutrition" asChild>
+              <TouchableOpacity style={styles.actionButton} activeOpacity={0.8}>
+                <View style={[styles.actionIcon, { backgroundColor: '#6787c2ff' }]}>
+                <Text style={styles.actionEmoji}>🍎</Text>
+                </View>
+                <Text style={styles.actionText}>Питание</Text>
               </TouchableOpacity>
             </Link>
 
