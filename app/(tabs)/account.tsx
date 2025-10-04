@@ -233,10 +233,6 @@ const Account: React.FC = () => {
 
   const achievements = [
     { icon: '🏆', title: 'Первая тренировка', unlocked: user.totalWorkouts > 0 },
-    { icon: '💧', title: 'Водохлёб', unlocked: user.totalWater > 10 },
-    { icon: '😴', title: 'Соня', unlocked: user.totalSleep > 5 },
-    { icon: '😊', title: 'Оптимист', unlocked: user.totalMoodLogs > 10 },
-    { icon: '🔥', title: 'Энерджайзер', unlocked: user.streak > 3 },
   ];
 
   return (

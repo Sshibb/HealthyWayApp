@@ -1,3 +1,4 @@
+// app/sleep.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -12,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { achievementsService } from './achievements-service';
+import { BeautifulAlert } from './BeautifulAlert';
+import { useAlert } from './useAlert';
 
 // Тип для записи сна
 interface SleepLog {
@@ -29,6 +32,7 @@ const Sleep: React.FC = () => {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [tempStart, setTempStart] = useState<Date>(new Date());
   const [tempEnd, setTempEnd] = useState<Date>(new Date());
+  const { alertConfig, showAlert, hideAlert } = useAlert();
 
   // Рассчитать общее среднее за последние 7 дней
   const totalDuration = logs.reduce((sum, log) => sum + log.durationHours, 0);
@@ -38,7 +42,12 @@ const Sleep: React.FC = () => {
   // Добавить запись сна
   const addSleepLog = async () => {
     if (tempStart >= tempEnd) {
-      Alert.alert('Ошибка', 'Время пробуждения должно быть позже времени засыпания');
+      showAlert({
+        title: '❌ Ошибка',
+        message: 'Время пробуждения должно быть позже времени засыпания',
+        type: 'error',
+        buttons: [{ text: 'Понятно', style: 'default' }]
+      });
       return;
     }
 
@@ -55,49 +64,54 @@ const Sleep: React.FC = () => {
     setLogs((prev) => [...prev, newLog]);
 
     // Проверка достижений
-    // Проверка достижений
-   // Проверка достижений
-try {
-  const currentAchievements = await achievementsService.loadAchievements();
-  
-  // Рассчитываем статистику для сна
-  const totalSleepHours = logs.reduce((sum, log) => sum + log.durationHours, 0) + durationHours;
-  const sleepDays = logs.filter(log => log.durationHours >= 8).length + (durationHours >= 8 ? 1 : 0);
+    try {
+      const currentAchievements = await achievementsService.loadAchievements();
+      
+      // Рассчитываем статистику для сна
+      const totalSleepHours = logs.reduce((sum, log) => sum + log.durationHours, 0) + durationHours;
+      const sleepDays = logs.filter(log => log.durationHours >= 8).length + (durationHours >= 8 ? 1 : 0);
 
-  const updatedAchievements = achievementsService.checkSleepAchievement(
-    durationHours, 
-    totalSleepHours,
-    sleepDays,
-    currentAchievements
-  );
-  await achievementsService.saveAchievements(updatedAchievements);
-  
-  // Показать уведомление о достижении, если разблокировано
-  if (durationHours >= 8) {
-    const sleepAchievement = updatedAchievements.find(a => a.id === 'first_sleep' && a.unlocked);
-    const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_sleep')?.unlocked === false;
-    
-    if (sleepAchievement && wasJustUnlocked) {
-      Alert.alert(
-        '🎉 Поздравляем!', 
-        'Вы получили достижение "Хороший сон"!\n\nВпервые проспали 8 часов',
-        [{ text: 'Отлично!', style: 'default' }]
+      const updatedAchievements = achievementsService.checkSleepAchievement(
+        durationHours, 
+        totalSleepHours,
+        sleepDays,
+        currentAchievements
       );
+      await achievementsService.saveAchievements(updatedAchievements);
+      
+      // Показать уведомление о достижении, если разблокировано
+      if (durationHours >= 8) {
+        const sleepAchievement = updatedAchievements.find(a => a.id === 'first_sleep' && a.unlocked);
+        const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_sleep')?.unlocked === false;
+        
+        if (sleepAchievement && wasJustUnlocked) {
+          showAlert({
+            title: '🎉 Поздравляем!',
+            message: 'Вы получили достижение "Хороший сон"!\n\nВпервые проспали 8 часов',
+            type: 'success',
+            buttons: [{ text: 'Отлично!', style: 'default' }]
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error checking achievements:', error);
     }
-  }
-} catch (error) {
-  console.error('Error checking achievements:', error);
-}
 
-    Alert.alert('✅ Успешно', `Записано: ${durationHours.toFixed(1)} часов сна`);
+    showAlert({
+      title: '✅ Успешно',
+      message: `Записано: ${durationHours.toFixed(1)} часов сна`,
+      type: 'success',
+      buttons: [{ text: 'Отлично!', style: 'default' }]
+    });
   };
 
   // Удалить запись
   const deleteLog = (id: string) => {
-    Alert.alert(
-      'Удалить запись?',
-      'Вы уверены, что хотите удалить эту запись сна?',
-      [
+    showAlert({
+      title: 'Удалить запись?',
+      message: 'Вы уверены, что хотите удалить эту запись сна?',
+      type: 'warning',
+      buttons: [
         { text: 'Отмена', style: 'cancel' },
         {
           text: 'Удалить',
@@ -105,7 +119,7 @@ try {
           onPress: () => setLogs((prev) => prev.filter((log) => log.id !== id)),
         },
       ]
-    );
+    });
   };
 
   // Форматирование времени
@@ -217,7 +231,21 @@ try {
           <View style={styles.historyHeader}>
             <Text style={styles.historyTitle}>История сна</Text>
             {logs.length > 0 && (
-              <TouchableOpacity onPress={() => setLogs([])}>
+              <TouchableOpacity onPress={() => {
+                showAlert({
+                  title: 'Очистить историю?',
+                  message: 'Вы уверены, что хотите удалить все записи сна?',
+                  type: 'warning',
+                  buttons: [
+                    { text: 'Отмена', style: 'cancel' },
+                    {
+                      text: 'Очистить',
+                      style: 'destructive',
+                      onPress: () => setLogs([]),
+                    },
+                  ]
+                });
+              }}>
                 <Text style={styles.resetText}>Очистить</Text>
               </TouchableOpacity>
             )}
@@ -289,6 +317,15 @@ try {
           />
         )}
       </ScrollView>
+
+      <BeautifulAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons || []}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };

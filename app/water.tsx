@@ -1,3 +1,4 @@
+// app/water.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -5,11 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { achievementsService } from './achievements-service';
+import { BeautifulAlert } from './BeautifulAlert';
+import { useAlert } from './useAlert';
 
 // Типы
 interface WaterLog {
@@ -22,6 +24,7 @@ const GOAL_ML = 2000; // Цель — 2 литра в день
 
 const Water: React.FC = () => {
   const [logs, setLogs] = useState<WaterLog[]>([]);
+  const { alertConfig, showAlert, hideAlert } = useAlert();
   const totalConsumed = logs.reduce((sum, log) => sum + log.amount, 0);
   const progress = Math.min(totalConsumed / GOAL_ML, 1);
 
@@ -36,49 +39,75 @@ const Water: React.FC = () => {
     setLogs((prev) => [...prev, newLog]);
 
     // Проверка достижений
-    // Проверка достижений
-try {
-  const currentAchievements = await achievementsService.loadAchievements();
-  
-  // Рассчитываем статистику для воды
-  const totalWater = logs.reduce((sum, log) => sum + log.amount, 0) + amount;
-  const waterDays = logs.filter(log => log.amount >= 2000).length + (newTotal >= 2000 ? 1 : 0);
+    try {
+      const currentAchievements = await achievementsService.loadAchievements();
+      const totalWater = logs.reduce((sum, log) => sum + log.amount, 0) + amount;
+      const waterDays = logs.filter(log => log.amount >= 2000).length + (newTotal >= 2000 ? 1 : 0);
 
-  const updatedAchievements = achievementsService.checkWaterAchievement(
-    newTotal, 
-    totalWater,
-    waterDays,
-    currentAchievements
-  );
-  await achievementsService.saveAchievements(updatedAchievements);
-  
-  // Показать уведомление о достижении, если разблокировано
-  if (newTotal >= 2000) {
-    const waterAchievement = updatedAchievements.find(a => a.id === 'first_water' && a.unlocked);
-    const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_water')?.unlocked === false;
-    
-    if (waterAchievement && wasJustUnlocked) {
-      Alert.alert(
-        '🎉 Поздравляем!', 
-        'Вы получили достижение "Водохлёб"!\n\nВпервые выпили 2 литра воды за день',
-        [{ text: 'Отлично!', style: 'default' }]
+      const updatedAchievements = achievementsService.checkWaterAchievement(
+        newTotal, 
+        totalWater,
+        waterDays,
+        currentAchievements
       );
+      await achievementsService.saveAchievements(updatedAchievements);
+      
+      // Красивый алерт для достижения
+      if (newTotal >= 2000) {
+        const waterAchievement = updatedAchievements.find(a => a.id === 'first_water' && a.unlocked);
+        const wasJustUnlocked = currentAchievements.find(a => a.id === 'first_water')?.unlocked === false;
+        
+        if (waterAchievement && wasJustUnlocked) {
+          showAlert({
+            title: '🎉 Поздравляем!',
+            message: 'Вы получили достижение "Водохлёб"!\n\nВпервые выпили 2 литра воды за день',
+            type: 'success',
+            buttons: [{ text: 'Отлично!', style: 'default' }]
+          });
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+      showAlert({
+        title: 'Ошибка',
+        message: 'Не удалось проверить достижения',
+        type: 'error',
+        buttons: [{ text: 'Понятно', style: 'default' }]
+      });
     }
-  }
-} catch (error) {
-  console.error('Error checking achievements:', error);
-}
-  }
+
+    // Обычное уведомление о добавлении воды
+    showAlert({
+      title: '✅ Вода добавлена!',
+      message: `Вы выпили ${amount} мл воды\nВсего сегодня: ${newTotal} мл`,
+      type: 'success',
+      buttons: [{ text: 'Отлично!', style: 'default' }]
+    });
+  };
 
   const resetLogs = () => {
-    Alert.alert(
-      'Сбросить данные?',
-      'Вы уверены, что хотите сбросить статистику за сегодня?',
-      [
+    showAlert({
+      title: 'Сбросить данные?',
+      message: 'Вы уверены, что хотите сбросить статистику за сегодня?',
+      type: 'warning',
+      buttons: [
         { text: 'Отмена', style: 'cancel' },
-        { text: 'Сбросить', style: 'destructive', onPress: () => setLogs([]) },
+        { 
+          text: 'Сбросить', 
+          style: 'destructive',
+          onPress: () => {
+            setLogs([]);
+            showAlert({
+              title: '✅ Данные сброшены',
+              message: 'Статистика за сегодня очищена',
+              type: 'success',
+              buttons: [{ text: 'OK', style: 'default' }]
+            });
+          }
+        },
       ]
-    );
+    });
   };
 
   const formatTime = (date: Date) => {
@@ -162,9 +191,11 @@ try {
         <View style={styles.historyContainer}>
           <View style={styles.historyHeader}>
             <Text style={styles.historyTitle}>История сегодня</Text>
-            <TouchableOpacity onPress={resetLogs}>
-              <Text style={styles.resetText}>Сбросить</Text>
-            </TouchableOpacity>
+            {logs.length > 0 && (
+              <TouchableOpacity onPress={resetLogs}>
+                <Text style={styles.resetText}>Сбросить</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {logs.length === 0 ? (
@@ -203,6 +234,15 @@ try {
           )}
         </View>
       </ScrollView>
+
+      <BeautifulAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons || []}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };
@@ -384,4 +424,5 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
+
 export default Water;
